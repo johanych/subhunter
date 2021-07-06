@@ -1,0 +1,92 @@
+#!/bin/sh
+DATE=$(date +%Y-%m-%d-%H-%M-%S)
+
+#curl -sL https://raw.githubusercontent.com/cihanmehmet/sub.sh/master/sub.sh | bash /dev/stdin -s $DOMAIN
+curl -s "https://crt.sh/?q=%25.$1&output=json"| jq -r '.[].name_value' 2>/dev/null | sed 's/\*\.//g' | sort -u | grep -o "\w.*$1" > crt1
+echo "[+] 1. Crt.sh => $(wc -l crt1 | awk '{ print $1}')"
+
+/root/go/bin/waybackurls $1 | cut -d"/" -f3 | sort -u > warchive1
+echo "[+] 2. WayBackMachine => $(wc -l warchive1 | awk '{ print $1}')"
+
+curl -s "https://dns.bufferover.run/dns?q=.$1" | jq -r .FDNS_A[] 2>/dev/null | cut -d ',' -f2 | grep -o "\w.*$1" | sort -u > dnsbuffer1
+curl -s "https://dns.bufferover.run/dns?q=.$1" | jq -r .RDNS[] 2>/dev/null | cut -d ',' -f2 | grep -o "\w.*$1" | sort -u >> dnsbuffer1 
+curl -s "https://tls.bufferover.run/dns?q=.$1" | jq -r .Results 2>/dev/null | cut -d ',' -f3 |grep -o "\w.*$1"| sort -u >> dnsbuffer1 
+sort -u dnsbuffer1 -o dnsbuffer1
+echo "[+] 3. Dns.bufferover.run => $(wc -l dnsbuffer1 | awk '{ print $1}')"
+
+curl -s "https://www.threatcrowd.org/searchApi/v2/domain/report/?domain=$1"|jq -r '.subdomains' 2>/dev/null |grep -o "\w.*$1" > threatcrowd1
+echo "[+] 4. Threatcrowd.org => $(wc -l threatcrowd1 | awk '{ print $1}')"
+
+curl -s "https://api.hackertarget.com/hostsearch/?q=$1"|grep -o "\w.*$1" > hackertarget1
+echo "[+] 5. Hackertarget.com => $(wc -l hackertarget1 | awk '{ print $1}')"
+
+#curl -s "https://certspotter.com/api/v0/certs?domain=$1" | jq -r '.[].dns_names[]' 2>/dev/null | grep -o "\w.*$1" | sort -u > certspotter1
+#echo "[+] 6. Certspotter.com => $(wc -l certspotter1 | awk '{ print $1}')"
+echo "[+] 6. Certspotter.com => n/a"
+
+curl -s "https://jldc.me/anubis/subdomains/$1" | jq -r '.' 2>/dev/null | grep -o "\w.*$1" > anubisdb1
+echo "[+] 7. Anubis-DB(jonlu.ca) => $(wc -l anubisdb1 | awk '{ print $1}')"
+
+python3 ~/Tools/vt-subdomains.py $1 > virustotal1
+echo "[+] 8. Virustotal => $(wc -l virustotal1 | awk '{ print $1}')"
+
+curl -s "https://otx.alienvault.com/api/v1/indicators/domain/$1/passive_dns"|jq '.passive_dns[].hostname' 2>/dev/null |grep -o "\w.*$1"|sort -u > alienvault1
+echo "[+] 9. Alienvault(otx) => $(wc -l alienvault1 | awk '{ print $1}')"
+
+curl -s "https://urlscan.io/api/v1/search/?q=domain:$1"|jq '.results[].page.domain' 2>/dev/null |grep -o "\w.*$1"|sort -u > urlscan1
+echo "[+] 10. Urlscan.io => $(wc -l urlscan1 | awk '{ print $1}')"
+
+curl -s "https://api.threatminer.org/v2/domain.php?q=$1&rt=5" | jq -r '.results[]' 2>/dev/null |grep -o "\w.*$1"|sort -u > threatminer1
+echo "[+] 11. Threatminer => $(wc -l threatminer1 | awk '{ print $1}')"
+
+#curl -s "https://ctsearch.entrust.com/api/v1/certificates?fields=subjectDN&domain=$1&includeExpired=false&exactMatch=false&limit=5000" | jq -r '.[].subjectDN' 2>/dev/null |sed 's/cn=//g'|grep -o "\w.*$1"|sort -u > entrust1
+#https://ui.ctsearch.entrust.com/ui/ctsearchui
+#echo "[+] 12. Entrust.com => $(wc -l entrust1 | awk '{ print $1}')"
+echo "[+] 12. Entrust.com => n/a"
+
+curl -s "https://riddler.io/search/exportcsv?q=pld:$1"| grep -o "\w.*$1"|awk -F, '{print $6}'|sort -u > riddler1
+#curl -s "https://riddler.io/search/exportcsv?q=pld:$1"|cut -d "," -f6|grep $1|sort -u >riddler_$1.txt
+echo "[+] 13. Riddler.io => $(wc -l riddler1 | awk '{ print $1}')"
+
+cmdtoken=$(curl -ILs https://dnsdumpster.com | grep csrftoken | cut -d " " -f2 | cut -d "=" -f2 | tr -d ";")
+curl -s --header "Host:dnsdumpster.com" --referer https://dnsdumpster.com --user-agent "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:45.0) Gecko/20100101 Firefox/45.0" --data "csrfmiddlewaretoken=$cmdtoken&targetip=$1" --cookie "csrftoken=$cmdtoken; _ga=GA1.2.1737013576.1458811829; _gat=1" https://dnsdumpster.com > dnsdumpster.html
+cat dnsdumpster.html|grep "https://api.hackertarget.com/httpheaders"|grep -o "\w.*$1"|cut -d "/" -f7|sort -u > dnsdumpster1
+rm dnsdumpster.html
+echo "[+] 14. Dnsdumpster => $(wc -l dnsdumpster1 | awk '{ print $1}')"
+
+/root/go/bin/findomain -t $1 -q -u findomain1 &>/dev/null
+wait
+echo "[+] 15. Findomain => $(wc -l findomain1 | awk '{ print $1}')"
+
+/root/go/bin/subfinder -silent -d $1 -o subfinder1 &>/dev/null
+wait
+echo "[+] 16. Subfinder => $(wc -l subfinder1 |awk '{ print $1}')"
+
+/root/go/bin/amass enum -passive -norecursive -noalts -nolocaldb -silent -d $1 -config /root/.config/amass/config.ini -o amass1 &>/dev/null
+wait
+echo "[+] 17. Amass => $(wc -l amass1 | awk '{ print $1}')"
+
+/root/go/bin/assetfinder $1 > assetfinder1
+wait
+echo "[+] 18. Assetfinder => $(wc -l  assetfinder1 | awk '{ print $1}')"
+
+curl -s "https://rapiddns.io/subdomain/$1?full=1#result" | grep -oaEi "https?://[^\"\\'> ]+" | grep $1 | cut -d "/" -f3 | sort -u > rapiddns1
+echo "[+] 19. Rapiddns => $(wc -l rapiddns1 | awk '{ print $1}')"
+
+/root/go/bin/chaos -d $1 -silent > chaos1
+echo "[+] 20. Chaos => $(wc -l chaos1 | awk '{ print $1}')"
+
+python3 ~/Tools/github-search/github-subdomains.py -t XXXXXXXXXXXXXXXXX -d $1 | grep -v github.com > github1
+echo "[+] 21. Github-Subdomains => $(wc -l github1 | awk '{ print $1}')"
+
+cat crt1 warchive1 dnsbuffer1 threatcrowd1 hackertarget1 certspotter1 anubisdb1 virustotal1 alienvault1 urlscan1 threatminer1 entrust1 riddler1 dnsdumpster1 findomain1 subfinder1 amass1 assetfinder1 rapiddns1 chaos1 github1 | sort -u | /root/go/bin/anew hosts
+
+echo "Detectando dominios vivos: ..."
+/root/go/bin/httpx -l hosts -silent -threads 9000 -timeout 30 | /root/go/bin/anew domains
+
+if [ -e subs-prev.txt ] ; then
+cat domains | cut -d"/" -f3 | /root/go/bin/anew subs-prev.txt > nsubs-$DATE.txt
+[ "$?" -eq "1" ] | cat nsubs-$DATE.txt | /root/go/bin/notify -silent -message-cli "Nuevos subdominios identificados: `cat nsubs-$DATE.txt`"
+fi
+
+rm -rf crt1 warchive1 dnsbuffer1 threatcrowd1 hackertarget1 certspotter1 anubisdb1 virustotal1 alienvault1 urlscan1 threatminer1 entrust1 riddler1 dnsdumpster1 findomain1 subfinder1 amass1 assetfinder1 rapiddns1 chaos1 github1 domains
