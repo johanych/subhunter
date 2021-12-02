@@ -1,7 +1,8 @@
 #!/bin/sh
 DATE=$(date +%Y-%m-%d-%H-%M-%S)
-
 #curl -sL https://raw.githubusercontent.com/cihanmehmet/sub.sh/master/sub.sh | bash /dev/stdin -s $DOMAIN
+
+printf "Detectando Subdominios ...\n"
 curl -s "https://crt.sh/?q=%25.$1&output=json"| jq -r '.[].name_value' 2>/dev/null | sed 's/\*\.//g' | sort -u | grep -o "\w.*$1" > crt1
 echo "[+] 1. Crt.sh => $(wc -l crt1 | awk '{ print $1}')"
 
@@ -20,9 +21,8 @@ echo "[+] 4. Threatcrowd.org => $(wc -l threatcrowd1 | awk '{ print $1}')"
 curl -s "https://api.hackertarget.com/hostsearch/?q=$1"|grep -o "\w.*$1" > hackertarget1
 echo "[+] 5. Hackertarget.com => $(wc -l hackertarget1 | awk '{ print $1}')"
 
-#curl -s "https://certspotter.com/api/v0/certs?domain=$1" | jq -r '.[].dns_names[]' 2>/dev/null | grep -o "\w.*$1" | sort -u > certspotter1
-#echo "[+] 6. Certspotter.com => $(wc -l certspotter1 | awk '{ print $1}')"
-echo "[+] 6. Certspotter.com => n/a"
+curl -s -H "Authorization: Bearer 36558_0q2I1TGAbzAVTi7MlHMx" "https://api.certspotter.com/v1/issuances?domain=$1&include_subdomains=true&expand=dns_names&expand=issuer" | jq -r '.[].dns_names[]' 2>/dev/null | grep -o "\w.*$1" | sort -u > certspotter1
+echo "[+] 6. Certspotter.com => $(wc -l certspotter1 | awk '{ print $1}')"
 
 curl -s "https://jldc.me/anubis/subdomains/$1" | jq -r '.' 2>/dev/null | grep -o "\w.*$1" > anubisdb1
 echo "[+] 7. Anubis-DB(jonlu.ca) => $(wc -l anubisdb1 | awk '{ print $1}')"
@@ -54,7 +54,7 @@ cat dnsdumpster.html|grep "https://api.hackertarget.com/httpheaders"|grep -o "\w
 rm dnsdumpster.html
 echo "[+] 14. Dnsdumpster => $(wc -l dnsdumpster1 | awk '{ print $1}')"
 
-/root/go/bin/findomain -t $1 -q -u findomain1 &>/dev/null
+/usr/local/bin/findomain -t $1 -q -u findomain1 &>/dev/null
 wait
 echo "[+] 15. Findomain => $(wc -l findomain1 | awk '{ print $1}')"
 
@@ -76,17 +76,59 @@ echo "[+] 19. Rapiddns => $(wc -l rapiddns1 | awk '{ print $1}')"
 /root/go/bin/chaos -d $1 -silent > chaos1
 echo "[+] 20. Chaos => $(wc -l chaos1 | awk '{ print $1}')"
 
-python3 ~/Tools/github-search/github-subdomains.py -t XXXXXXXXXXXXXXXXX -d $1 | grep -v github.com > github1
+python3 ~/Tools/github-search/github-subdomains.py -t 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 -d $1 | grep -v github.com > github1
 echo "[+] 21. Github-Subdomains => $(wc -l github1 | awk '{ print $1}')"
 
-cat crt1 warchive1 dnsbuffer1 threatcrowd1 hackertarget1 certspotter1 anubisdb1 virustotal1 alienvault1 urlscan1 threatminer1 entrust1 riddler1 dnsdumpster1 findomain1 subfinder1 amass1 assetfinder1 rapiddns1 chaos1 github1 | sort -u | /root/go/bin/anew hosts
+python3 /root/Sublist3r/sublist3r.py -d $1 -o sublister1
+echo "[+] 22. Sublist3r => $(wc -l sublister1 | awk '{ print $1}')"
 
-echo "Detectando dominios vivos: ..."
-/root/go/bin/httpx -l hosts -silent -threads 9000 -timeout 30 | /root/go/bin/anew domains
+cat crt1 warchive1 dnsbuffer1 threatcrowd1 hackertarget1 certspotter1 anubisdb1 virustotal1 alienvault1 urlscan1 threatminer1 riddler1 dnsdumpster1 findomain1 subfinder1 amass1 assetfinder1 rapiddns1 chaos1 github1 sublister1 | sort -u | /root/go/bin/anew -q hosts
 
-if [ -e subs-prev.txt ] ; then
-cat domains | cut -d"/" -f3 | /root/go/bin/anew subs-prev.txt > nsubs-$DATE.txt
-[ "$?" -eq "1" ] | cat nsubs-$DATE.txt | /root/go/bin/notify -silent -message-cli "Nuevos subdominios identificados: `cat nsubs-$DATE.txt`"
-fi
+#printf "\nDetectando Subdominios vivos: ...\n"
+#/root/go/bin/httpx -l hosts -silent -threads 9000 -timeout 30 | /root/go/bin/anew -q domains
 
-rm -rf crt1 warchive1 dnsbuffer1 threatcrowd1 hackertarget1 certspotter1 anubisdb1 virustotal1 alienvault1 urlscan1 threatminer1 entrust1 riddler1 dnsdumpster1 findomain1 subfinder1 amass1 assetfinder1 rapiddns1 chaos1 github1 domains
+#if [ -e subs-prev.txt ] ; then
+#cat domains | cut -d"/" -f3 | /root/go/bin/anew -q subs-prev.txt > nsubs-$DATE.txt
+#[ "$?" -eq "1" ] | cat nsubs-$DATE.txt | /root/go/bin/notify -silent -message-cli "Nuevos subdominios identificados: `cat nsubs-$DATE.txt`"
+#fi
+
+#if [ -e hosts ] ; then
+#cat domains | cut -d"/" -f3 | /root/go/bin/anew -q hosts > nhosts-$DATE.txt
+#[ "$?" -eq "1" ] | cat nhosts-$DATE.txt | /root/go/bin/notify -silent -message-cli "Nuevos hosts identificados: `cat nhosts-$DATE.txt`"
+
+#for i in $(cat nhosts-$DATE.txt); do dig +short $i; done | grep '^[.0-9]*$' | sort -u | /root/go/bin/anew -q ips > nips-$DATE.txt
+#/usr/local/bin/masscan -p0-65535 -iL nips-$DATE.txt --rate 100000 -oG ips_scan
+#cat ips_scan | grep Host | cut -d" " -f3,5 | sed 's/ /:/g' | cut -d"/" -f1 | /root/go/bin/httpx -silent | /root/go/bin/anew -q ips_puertos_vivos
+
+#fi
+
+rm -rf crt1 warchive1 dnsbuffer1 threatcrowd1 hackertarget1 certspotter1 anubisdb1 virustotal1 alienvault1 urlscan1 threatminer1 entrust1 riddler1 dnsdumpster1 findomain1 subfinder1 amass1 assetfinder1 rapiddns1 chaos1 github1 sublister1
+
+# revisar puertos en subdominios que no responden a hhtpx (masscan)
+# buscar info en github
+# buscar info en darknet
+# content discovery con ffuf en los hosts vivos
+#ffuf -w common.txt:FUZZ -w ~/bb/target/httpx.txt:URL -u URLFUZZ -mc 200 -of csv -o ffuf-result.txt
+# Agregar oneliners para identificar vulns web + nuclei
+# Una vez completo, subir copia a github
+# tko-subs
+# Shodan
+# todos los scans se deben ejecutar si se encuentran hosts o subdominios nuevos
+
+#echo "Escaneando Vulnerabilidad HEARTBLEED"
+#cat subdomains | while read line ; do echo "QUIT" | openssl s_client -connect $line:443 2>&1 | grep 'server extension "heartbeat" (id=15)' || echo $line: safe; done;
+#echo "Escaneando Vulnerabilidad SUBDOMAIN TAKEOVER"
+#subjack -w subdomains -t 100 -timeout 30 -ssl -c ~/go/src/github.com/haccer/subjack/fingerprints.json -v 3 |tee takeover ;
+#echo "Extrayendo Links de paginas"
+#wayback $target | tee pagelinks; #agregar gau
+#echo "Validando debilidad CORS"
+#gau $target | while read url;do target=$(curl -s -I -H "Origin: https://evil.com" -X GET $url) | if grep 'https://evil.com'; then [Posible CORS] echo $url;else echo No vi nada en "$url";fi;done;
+#echo "Validando LFI"
+#cat pagelinks|gf lfi | qsreplace "/etc/passwd" | xargs -I% -P 25 sh -c 'curl -s "%" 2>&1 | grep -q "root:x" && echo "VULN! %"';
+#echo "Validando OPENREDIRECTS"
+#export LHOST="http://localhost";cat pagelinks|gf redirect | qsreplace "$LHOST" | xargs -I % -P 25 sh -c 'curl -Is "%" 2>&1 | grep -q "Location: $LHOST" && echo "VULN! %"';
+#echo "Validando XSS"
+#cat pagelinks | grep "=" | egrep -iv ".(jpg|jpeg|gif|css|tif|tiff|png|ttf|woff|woff2|ico|pdf|svg|txt|js)" | qsreplace '"><script>confirm(1)</script>' | tee combinedfuzz.json && cat combinedfuzz.json | while read host do ; do curl -s --path-as-is --insecure "$host" | grep -qa "<script>confirm(1)" && echo -e "$host \033[0;31mVulnerable" || echo -e "$host \033[0;32mNoVulnerable \033[0;00m";done
+
+#echo "Validando Templates de vulnerabilidades comunes"
+#cat subs-prev.txt | nuclei -t /root/nuclei-templates/ -c 500 -stats -timeout 5 -severity critical,high,medium,low | anew vulns #| notify -silent
