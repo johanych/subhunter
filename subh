@@ -21,7 +21,7 @@ echo "[+] 4. Threatcrowd.org => $(wc -l threatcrowd1 | awk '{ print $1}')"
 curl -s "https://api.hackertarget.com/hostsearch/?q=$1"|grep -o "\w.*$1" > hackertarget1
 echo "[+] 5. Hackertarget.com => $(wc -l hackertarget1 | awk '{ print $1}')"
 
-curl -s -H "Authorization: Bearer 36558_0q2I1TGAbzAVTi7MlHMx" "https://api.certspotter.com/v1/issuances?domain=$1&include_subdomains=true&expand=dns_names&expand=issuer" | jq -r '.[].dns_names[]' 2>/dev/null | grep -o "\w.*$1" | sort -u > certspotter1
+curl -s -H "Authorization: Bearer 36558_0q2I1TGAbzAVTi" "https://api.certspotter.com/v1/issuances?domain=$1&include_subdomains=true&expand=dns_names&expand=issuer" | jq -r '.[].dns_names[]' 2>/dev/null | grep -o "\w.*$1" | sort -u > certspotter1
 echo "[+] 6. Certspotter.com => $(wc -l certspotter1 | awk '{ print $1}')"
 
 curl -s "https://jldc.me/anubis/subdomains/$1" | jq -r '.' 2>/dev/null | grep -o "\w.*$1" > anubisdb1
@@ -76,7 +76,7 @@ echo "[+] 19. Rapiddns => $(wc -l rapiddns1 | awk '{ print $1}')"
 /root/go/bin/chaos -d $1 -silent > chaos1
 echo "[+] 20. Chaos => $(wc -l chaos1 | awk '{ print $1}')"
 
-python3 ~/Tools/github-search/github-subdomains.py -t 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 -d $1 | grep -v github.com > github1
+python3 ~/Tools/github-search/github-subdomains.py -t ghp_AO9g39dBRWSQbpY26qNkJEI8haF8 -d $1 | grep -v github.com > github1
 echo "[+] 21. Github-Subdomains => $(wc -l github1 | awk '{ print $1}')"
 
 python3 /root/Sublist3r/sublist3r.py -d $1 -o sublister1
